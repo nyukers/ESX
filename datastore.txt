@@ -1,0 +1,59 @@
+Administrator@vsphere.local
+
+################################### vCenter Server:
+
+Hit "Alt-F1" for entrance to Console:
+
+esxcli system maintenanceMode set -e true
+
+vmkfstools -P /vmfs/volumes/datastore1/
+
+esxcli storage filesystem unmount -l datastore1
+
+/usr/sbin/vmkfstools -C vmfs5 -b 1m -S esx1-lab-local /vmfs/devices/disks/t10.ATA_____Virtual_HD______________________:3
+
+esxcli system shutdown reboot -r reassigndatastore
+
+esxcli system maintenanceMode set --enable false --timeout=1
+
+
+
+#################################### vCenter Server Appliance:
+
+The actions taken in this article are performed on Vcenter Server Appliance (VCSA) and use the VCSA vPostgres database.
+Warning: Because operations are performed on the Vcenter database, it is recommended that Vcenter take a snapshot or backup before starting operations. It is connected primarily by VCSA ssh.
+
+The psql tool is run.
+
+You may get any error: 
+“Datastore ‘StorageX’ conflicts with an existing datastore in the datacenter that has the same URL (ds:///vmfs/volumes/xxxxxxxx-xxxxxxxx-xxxx-xxxxxxxxxxxx/) but is backed by different physical storage.”
+
+Below are the symtoms which you may encounter with:
+
+Unable to remove the datastore from the vCenter Server inventory.
+The datastore is grayed out.
+All options for the datastore are grayed out.
+
+To resolve this issue, manually remove the datastore references from the vCenter Server Inventory.
+
+1) Run the following to identify the objects using the datastore:
+select * from VPX_ENTITY where name = ‘<datastore_name>’ The above returns the ID
+
+Run the following to see what uses it:
+select * from VPX_DS_ASSIGNMENT where DS_ID=<ID>;
+select * from VPX_VM_DS_SPACE where DS_ID=<ID>;
+select * from VPX_DATASTORE where ID=<ID>;
+select * from VPX_ENTITY where ID=<ID>;
+
+2) Identify and the objects identified by the second query from the inventory:
+select ENTITY_ID from VPX_DS_ASSIGNMENT where DS_ID=<ID>; 
+This returns the ENTITY_ID
+
+select * from VPX_ENTITY where ID = <ENTITY_ID>
+
+3) Remove the objects (templates, VMs) using the vSphere Client from the inventory:
+DELETE FROM vpx_ds_assignment WHERE ds_id=1537714; 
+DELETE FROM vpx_datastore WHERE id=1537714; 
+DELETE FROM vpx_vm_ds_space WHERE ds_id=1537714;
+
+The datastore should disappear after all objects using it are removed.
